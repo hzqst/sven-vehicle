@@ -1,0 +1,214 @@
+@BaseClass = Angles
+[
+	angles(string) : "Pitch Yaw Roll (X Y Z)" : "0 0 0"
+]
+
+@BaseClass base(Mandatory) = Targetname
+[
+	targetname(target_source) : "Name"
+]
+
+@BaseClass = Target
+[
+	target(target_destination) : "Target"
+]
+
+@BaseClass = ZHLTbmodel
+[
+	zhlt_usemodel(string) : "ZHLT Template Model Target"
+	zhlt_copylight(string) : "ZHLT Copy Lighting From Target"
+	zhlt_noclip(choices) : "ZHLT Disable Clipping" : 0 =
+	[
+		0 : "Default"
+		1 : "Always non-solid"
+	]
+	zhlt_invisible(choices) : "ZHLT Invisible" : 0 =
+	[
+		0 : "Visible (default)"
+		1 : "Invisible"
+	]
+	zhlt_customshadow(string) : "ZHLT Custom Shadow (when opaque)"
+	zhlt_embedlightmap(choices) : "ZHLT Embed Light Map (when translucent)" : 0 =
+	[
+		0 : "No (default)"
+		1 : "Yes"
+	]
+	zhlt_embedlightmapresolution(integer) : "ZHLT Embed Light Map Resolution" : 4
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_studiomodel : "Studio Model Render Entity"
+[
+	model(studio) : "Model"
+	framerate(integer) : "Frames per second" : 1
+	frame(integer) : "Current frame" : 0
+	body(integer) : "Current body" : 0
+	skin(integer) : "Current skin" : 0
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	lod1(integer) : "Use LoD1 if this distance exceeded"
+	lod1body(integer) : "body for LoD1"
+	lod2(integer) : "Use LoD2 if this distance exceeded"
+	lod2body(integer) : "body for LoD2"
+	lod3(integer) : "Use LoD3 if this distance exceeded"
+	lod3body(integer) : "body for LoD3"
+	target(string) : "Copy from entity"
+	origin_offset(string) : "Origin offset"
+	angles_offset(string) : "Angles offset"
+	spawnflags(flags) =
+	[
+		1 : "Copy origin from entity" : 0
+		2 : "Copy angles from entity" : 0
+		4 : "USE_SET change skin" : 0
+		8 : "USE_SET change body" : 0
+		32 : "Copy origin.z from entity" : 0
+		64 : "Copy EF_NODRAW bit from entity" : 0
+		128 : "Animated Studio Model" : 0
+		256 : "Play Sequence On Toggle" : 0
+		512 : "Remove self on anim finish" : 0
+		1024 : "Animated Sprite " : 0
+		2048 : "Remove self on bound excceeded" : 0
+		4096 : "Static Frame" : 0
+	]
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_physicmodel : "Studio Model moves in physic engine"
+[
+	model(studio) : "Model"
+	framerate(integer) : "Frames per second" : 1
+	frame(integer) : "Current frame" : 0
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	lod1(integer) : "Use LoD1 if this distance exceeded"
+	lod1body(integer) : "body for LoD1"
+	lod2(integer) : "Use LoD2 if this distance exceeded"
+	lod2body(integer) : "body for LoD2"
+	lod3(integer) : "Use LoD3 if this distance exceeded"
+	lod3body(integer) : "body for LoD3"
+	mass(integer) : "Mass of created physic objects"
+	restitution(integer) : "Restitution of created physic objects"
+	linearfriction(integer) : "Linear friction of created physic objects"
+	rollingfriction(integer) : "Rolling friction of created physic objects"
+	impactimpulsethreshold(integer) : "Thresold of impact impulse"
+	impactimpulsevolumefactor(integer) : "Volume factor of impact impulse"
+	impactsoundattenuation(integer) : "Impact Sound Attenuation"
+	ccdradius(integer) : "ccd radius"
+	ccdthreshold(integer) : "ccd threshold"
+	halfextent(string) : "half extent box (x,y,z)"
+	shapedirection(choices) : "Direction of shape" : 0 =
+	[
+		0 : "X"
+		1 : "Y"
+		2 : "Z"
+	]
+	shapetype(choices) : "Type of shape" : 0 =
+	[
+		0 : "None"
+		1 : "Box"
+		2 : "Sphere"
+		3 : "Capsule"
+		4 : "Cylinder"
+		5 : "MultiSphere"
+	]
+	clippinghull_shapetype(choices) : "Type of shape of clipping hull" : 1 =
+	[
+		0 : "None"
+		1 : "Box"
+		4 : "Cylinder"
+	]
+	pointradius(string) : "Point Radius Array for MultiSphere Shape"
+	livingmins(string) : "Living box mins (x,y,z), Entity get killed when getting outside of living box"
+	livingmaxs(string) : "Living box maxs (x,y,z), Entity get killed when getting outside of living box"
+	spawnflags(flags) =
+	[
+		128 : "Create Clipping Hull Box" : 0
+		256 : "PlaySound when impact player" : 0
+		512 : "Freeze" : 0
+		1024 : "Kinematic" : 0
+	]
+]
+
+@SolidClass base(Global, Appearflags, Targetname, RenderFields, Angles, ZHLT)  = func_physic_pushable : "pushable brushent moves in physic engine"
+[
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	mass(integer) : "Mass of created physic objects"
+	restitution(integer) : "Restitution of created physic objects"
+	linearfriction(integer) : "Linear friction of created physic objects"
+	rollingfriction(integer) : "Rolling friction of created physic objects"
+	halfextent(string) : "half extent box (x,y,z)"
+	livingmins(string) : "Living box mins (x,y,z), Entity get killed when getting outside of living box"
+	livingmaxs(string) : "Living box maxs (x,y,z), Entity get killed when getting outside of living box"
+	spawnflags(flags) =
+	[
+		1 : "Physic Box" : 0
+		2 : "Physic Sphere" : 0
+		4 : "Physic Cylinder" : 0
+		8 : "Physic MultiSphere" : 0
+		16 : "Physic Capsule" : 0
+		128 : "Create Clipping Hull Box" : 0
+		256 : "PlaySound when impact player" : 0
+		512 : "Freeze" : 0
+	]
+	shapedirection(choices) : "Direction of shape" : 0 =
+	[
+		0 : "X"
+		1 : "Y"
+		2 : "Z"
+	]
+]
+
+@PointClass base(Targetname, Angles) studio() color(128 128 128) = env_physic_vehicle : "Vehicle in physic engine"
+[
+	rendermode(choices) : "Render Mode" : 0 =
+	[
+		0: "Normal"
+		1: "Color"
+		2: "Texture"
+		3: "Glow"
+		4: "Solid"
+		5: "Additive"
+	]
+	renderamt(integer) : "FX Amount (1 - 255)"
+	rendercolor(color255) : "FX Color (R G B)" : "0 0 0"
+	mass(integer) : "Mass of created physic objects"
+	restitution(integer) : "Restitution of created physic objects"
+	linearfriction(integer) : "Linear friction of created physic objects"
+	rollingfriction(integer) : "Rolling friction of created physic objects"
+	halfextent(string) : "half extent box (x,y,z)"
+	livingmins(string) : "Living box mins (x,y,z), Entity get killed when getting outside of living box"
+	livingmaxs(string) : "Living box maxs (x,y,z), Entity get killed when getting outside of living box"
+	centerofmass(string) : "Center of mass offset"
+	spawnflags(flags) =
+	[
+		128 : "Create Clipping Hull Box" : 0
+		256 : "PlaySound when impact player" : 0
+		512 : "Freeze" : 0
+	]
+]
