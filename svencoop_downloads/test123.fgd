@@ -184,6 +184,7 @@
 	]
 ]
 
+
 @PointClass base(Targetname, Angles) studio() color(128 128 128) = env_physic_vehicle : "Vehicle in physic engine"
 [
 	rendermode(choices) : "Render Mode" : 0 =
@@ -202,13 +203,39 @@
 	linearfriction(integer) : "Linear friction of created physic objects"
 	rollingfriction(integer) : "Rolling friction of created physic objects"
 	halfextent(string) : "half extent box (x,y,z)"
+	ccdradius(integer) : "ccd radius"
+	ccdthreshold(integer) : "ccd threshold"
 	livingmins(string) : "Living box mins (x,y,z), Entity get killed when getting outside of living box"
 	livingmaxs(string) : "Living box maxs (x,y,z), Entity get killed when getting outside of living box"
-	centerofmass(string) : "Center of mass offset"
 	spawnflags(flags) =
 	[
 		128 : "Create Clipping Hull Box" : 0
 		256 : "PlaySound when impact player" : 0
 		512 : "Freeze" : 0
 	]
+	vehicle_type(choices) : "Vehicle Type" : 0 =
+	[
+		1 : "Four Wheels"
+		2 : "Airboat"
+	]
+	
+	idle_engine_force(integer) : "m_flIdleEngineForce"
+	engine_max_motor_force(integer) : "m_flEngineMaxMotorForce"
+	engine_max_motor_force_backward(integer) : "m_flEngineMaxMotorForceBackward"
+	engine_max_speed(integer) : "m_flEngineMaxSpeed"
+	idle_steering_force(integer) : "m_flIdleSteeringForce"
+	steering_max_motor_force(integer) : "m_flSteeringMaxMotorForce"
+	steering_speed(integer) : "m_flSteeringSpeed"
+	max_steering_angular(integer) : "m_flMaxSteeringAngular"
+	brake_max_motor_force(integer) : "m_flBrakeMaxMotorForce"
+	start_sound(string) : "m_szStartSound"
+	idle_loop_sound(string) : "m_szIdleLoopSound"
+	trans_to_idle_sound(string) : "m_szTransToIdleSound"
+	stop_sound(string) : "m_szStopSound"
+	engine_loop_sound_0(string) : "m_szEngineLoopSound[0]"
+	engine_loop_sound_1(string) : "m_szEngineLoopSound[1]"
+	engine_loop_sound_2(string) : "m_szEngineLoopSound[2]"
+	friction_sound_0(string) : "m_szFrictionSound[0]"
+	friction_sound_1(string) : "m_szFrictionSound[1]"
+	friction_sound_2(string) : "m_szFrictionSound[2]"
 ]

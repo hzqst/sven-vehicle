@@ -1,3 +1,4 @@
+
 const int PhysicShapeDirection_X = 0;
 const int PhysicShapeDirection_Y = 1;
 const int PhysicShapeDirection_Z = 2;
@@ -17,6 +18,10 @@ const int PhysicWheel_Engine = 2;
 const int PhysicWheel_Brake = 4;
 const int PhysicWheel_Steering = 8;
 const int PhysicWheel_NoSteering = 0x10;
+const int PhysicWheel_Pontoon = 0x20;
+
+const int PhysicVehicleType_FourWheels = 1;
+const int PhysicVehicleType_Airboat = 2;
 
 const int FollowEnt_CopyOriginX = 1;
 const int FollowEnt_CopyOriginY = 2;
@@ -161,9 +166,51 @@ const int FL_WORLDBRUSH	 = (1<<25);
 const int FL_KILLME = (1<<30);
 
 array<EHandle> g_ArrayPlayerControlVehicles(33);
-//array<EHandle> g_ArrayPlayerControlVehicleFakeSeat(33);
-//array<EHandle> g_ArrayPlayerControlVehicleFakePlayer(33);
 array<float> g_ArrayPlayerControlVehicleTime(33);
+
+class CFuncPhysicWater : ScriptBaseEntity
+{
+	float m_flDensity = 1.0;
+	float m_flLinearDrag = 0.00002;
+	float m_flAngularDrag = 0.000015;
+
+	void Precache()
+	{
+		BaseClass.Precache();
+	}
+
+	void Spawn()
+	{
+		Precache();
+		self.pev.solid = SOLID_NOT;
+		self.pev.movetype = MOVETYPE_NONE;
+		self.pev.effects |= EF_NODRAW;
+
+		g_EntityFuncs.SetModel( self, self.pev.model );
+		g_EntityFuncs.SetSize( self.pev, self.pev.mins, self.pev.maxs );
+		g_EntityFuncs.SetOrigin( self, self.pev.origin );
+
+		g_EntityFuncs.CreatePhysicWater(self.edict(), m_flDensity, m_flLinearDrag, m_flAngularDrag);
+	}
+
+	bool KeyValue( const string & in szKey, const string & in szValue )
+	{
+		if(szKey == "density"){
+			m_flDensity = atof(szValue);
+			return true;
+		}
+		if(szKey == "lineardrag"){
+			m_flLinearDrag = atof(szValue);
+			return true;
+		}
+		if(szKey == "angulardrag"){
+			m_flAngularDrag = atof(szValue);
+			return true;
+		}
+
+		return BaseClass.KeyValue( szKey, szValue );
+	}
+}
 
 class CEnvPhysicModel : ScriptBaseEntity
 {
@@ -174,6 +221,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 	int m_iClippingHullShapeType = PhysicShape_Box;
 	int m_iClippingHullShapeDirection = PhysicShapeDirection_Z;
 	float m_flMass = 10.0;
+	float m_flDensity = 1.0;
 	float m_flLinearFriction = 1.0;
 	float m_flRollingFriction = 1.0;
 	float m_flRestitution = 0.0;
@@ -241,6 +289,10 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 		if(szKey == "mass"){
 			m_flMass = atof(szValue);
+			return true;
+		}
+		if(szKey == "density"){
+			m_flDensity = atof(szValue);
 			return true;
 		}
 		if(szKey == "linearfriction"){
@@ -361,6 +413,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 			PhysicObjectParams objectParams;
 			objectParams.mass = m_flMass;
+			objectParams.density = m_flDensity;
 			objectParams.linearfriction = m_flLinearFriction;
 			objectParams.rollingfriction = m_flRollingFriction;
 			objectParams.restitution = m_flRestitution;
@@ -400,6 +453,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 			PhysicObjectParams objectParams;
 			objectParams.mass = m_flMass;
+			objectParams.density = m_flDensity;
 			objectParams.linearfriction = m_flLinearFriction;
 			objectParams.rollingfriction = m_flRollingFriction;
 			objectParams.restitution = m_flRestitution;
@@ -441,6 +495,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 			PhysicObjectParams objectParams;
 			objectParams.mass = m_flMass;
+			objectParams.density = m_flDensity;
 			objectParams.linearfriction = m_flLinearFriction;
 			objectParams.rollingfriction = m_flRollingFriction;
 			objectParams.restitution = m_flRestitution;
@@ -482,6 +537,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 			PhysicObjectParams objectParams;
 			objectParams.mass = m_flMass;
+			objectParams.density = m_flDensity;
 			objectParams.linearfriction = m_flLinearFriction;
 			objectParams.rollingfriction = m_flRollingFriction;
 			objectParams.restitution = m_flRestitution;
@@ -532,6 +588,7 @@ class CEnvPhysicModel : ScriptBaseEntity
 
 			PhysicObjectParams objectParams;
 			objectParams.mass = m_flMass;
+			objectParams.density = m_flDensity;
 			objectParams.linearfriction = m_flLinearFriction;
 			objectParams.rollingfriction = m_flRollingFriction;
 			objectParams.restitution = m_flRestitution;
@@ -913,7 +970,7 @@ class CFuncPhysicPushable : ScriptBaseEntity
 	}
 }
 
-class CEnvPhysicVehicle : ScriptBaseEntity
+class CEnvPhysicVehicle : ScriptBaseAnimating
 {
 	Vector m_vecHalfExtent = Vector(1.0, 1.0, 1.0);
 	float m_flImpactImpulseThreshold = 0;
@@ -935,7 +992,7 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 	float m_flIdleEngineForce = 2000000;
 	float m_flEngineMaxMotorForce = 2000000;
 	float m_flEngineMaxMotorForceBackward = 1600000;
-	float m_flEngineSpeed = 25;
+	float m_flEngineMaxSpeed = 25;
 	float m_flIdleSteeringForce = 2000000;
 	float m_flSteeringMaxMotorForce = 2000000; 
 	float m_flSteeringSpeed = 4;
@@ -943,32 +1000,63 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 	float m_flBrakeMaxMotorForce = 3200000;
 
 	array<string> m_Wheels(4);
+	int m_iVehicleType = 0;
 
 	CBasePlayer@ m_pDriver;
 
+	bool m_bIsStartSoundPlayed = false;
 	bool m_bIsPlayingLoopSound = false;
 	bool m_bIsPlayingFrictionSound = false;
 	float m_flVolume = 1.0;
 	float m_flLastPlayingLoopSound = 0;
-	float m_flLoopSoundDuration = 3.0;
 	float m_flLastPlayingFrictionSound = 0;
+	float m_flCurrentLoopSoundDuration = 0;
+	float m_flCurrentFrictionSoundDuration = 0;
+	int m_iCurrentLoopEngineSoundIndex = 0;
 	string m_szCurrentLoopSound;
 	string m_szCurrentFrictionSound;
 
 	string m_szStartSound = "test123/v8/v8_start_loop1.wav";
+	float m_flStartSoundDuration = 0;
+
+	string m_szIdleLoopSound = "test123/v8/v8_idle_loop1.wav";
+	float m_flIdleLoopSoundDuration = 0;
+
+	string m_szTransToIdleSound = "test123/v8/v8_rev_short_loop1.wav";
+	float m_flTransToIdleSoundDuration = 0;
+
 	string m_szStopSound = "test123/v8/v8_stop1.wav";
-	array<string> m_szLoopSound = {
+	float m_flStopSoundDuration = 0;
+
+	array<string> m_szEngineLoopSound = {
 		"test123/v8/first.wav",
 		"test123/v8/second.wav",
 		"test123/v8/third.wav"
 	};
+	array<float> m_flEngineLoopSoundDuration = {
+		0, 0, 0
+	};
+
 	array<string> m_szFrictionSound = {
 		"test123/v8/skid_highfriction.wav"
+	};
+	array<float> m_flFrictionSoundDuration = {
+		0
 	};
 
 	bool m_bIsEngineRunning = false;
 	bool m_bIsEngineBackward = false;
 	bool m_bIsEngineBraking = false;
+	bool m_bIsSteering = false;
+	bool m_bIsSteeringLeft = false;
+	bool m_bIsSteeringRight = false;
+
+	//For Airboat
+	float m_flSpinRate = 0;
+	float m_flTargetSpinRate = 0;
+
+	float m_flPropController = 0;
+	float m_flTargetPropController = 0;
 
 	void Precache()
 	{
@@ -976,15 +1064,70 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 
 		g_Game.PrecacheModel( self.pev.model );
 
-		g_SoundSystem.PrecacheSound( m_szStartSound );
-		g_SoundSystem.PrecacheSound( m_szStopSound );
-		for(int i = 0;i < int(m_szLoopSound.length()); ++i)
+		if(!m_szStartSound.IsEmpty())
 		{
-			g_SoundSystem.PrecacheSound( m_szLoopSound[i] );
+			g_SoundSystem.PrecacheSound( m_szStartSound );
+
+			SoundEngine_SoundInfo info;
+			g_SoundSystem.GetSoundInfo(m_szStartSound, info);
+
+			m_flStartSoundDuration = float(info.length) / 1000.0;
 		}
+
+		if(!m_szStopSound.IsEmpty())
+		{
+			g_SoundSystem.PrecacheSound( m_szStopSound );
+			
+			SoundEngine_SoundInfo info;
+			g_SoundSystem.GetSoundInfo(m_szStopSound, info);
+
+			m_flStopSoundDuration = float(info.length) / 1000.0;
+		}
+			
+		if(!m_szIdleLoopSound.IsEmpty())
+		{
+			g_SoundSystem.PrecacheSound( m_szIdleLoopSound );
+			
+			SoundEngine_SoundInfo info;
+			g_SoundSystem.GetSoundInfo(m_szIdleLoopSound, info);
+
+			m_flIdleLoopSoundDuration = float(info.length) / 1000.0;
+		}
+
+		if(!m_szTransToIdleSound.IsEmpty())
+		{
+			g_SoundSystem.PrecacheSound( m_szTransToIdleSound );
+			
+			SoundEngine_SoundInfo info;
+			g_SoundSystem.GetSoundInfo(m_szTransToIdleSound, info);
+
+			m_flTransToIdleSoundDuration = float(info.length) / 1000.0;
+		}
+
+		for(int i = 0;i < int(m_szEngineLoopSound.length()); ++i)
+		{
+			if(!m_szEngineLoopSound[i].IsEmpty())
+			{
+				g_SoundSystem.PrecacheSound( m_szEngineLoopSound[i] );
+				
+				SoundEngine_SoundInfo info;
+				g_SoundSystem.GetSoundInfo(m_szEngineLoopSound[i], info);
+
+				m_flEngineLoopSoundDuration[i] = float(info.length) / 1000.0;
+			}
+		}
+		
 		for(int i = 0;i < int(m_szFrictionSound.length()); ++i)
 		{
-			g_SoundSystem.PrecacheSound( m_szFrictionSound[i] );
+			if(!m_szFrictionSound[i].IsEmpty())
+			{
+				g_SoundSystem.PrecacheSound( m_szFrictionSound[i] );
+				
+				SoundEngine_SoundInfo info;
+				g_SoundSystem.GetSoundInfo(m_szFrictionSound[i], info);
+
+				m_flFrictionSoundDuration[i] = float(info.length) / 1000.0;
+			}
 		}
 	}
 
@@ -1012,6 +1155,93 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 		}
 		if(szKey == "ccdthreshold"){
 			m_flCCDThreshold = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "idle_engine_force"){
+			m_flIdleEngineForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "engine_max_motor_force"){
+			m_flEngineMaxMotorForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "engine_max_motor_force_backward"){
+			m_flEngineMaxMotorForceBackward = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "engine_max_speed"){
+			m_flEngineMaxSpeed = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "idle_steering_force"){
+			m_flIdleSteeringForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "steering_max_motor_force"){
+			m_flSteeringMaxMotorForce = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "steering_speed"){
+			m_flSteeringSpeed = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "max_steering_angular"){
+			m_flMaxSteeringAngular = atof(szValue);
+			return true;
+		}
+
+		if(szKey == "brake_max_motor_force"){
+			m_flBrakeMaxMotorForce = atof(szValue);
+			return true;
+		}
+
+
+		if(szKey == "start_sound"){
+			m_szStartSound = szValue;
+			return true;
+		}
+		if(szKey == "idle_loop_sound"){
+			m_szIdleLoopSound = szValue;
+			return true;
+		}
+		if(szKey == "trans_to_idle_sound"){
+			m_szTransToIdleSound = szValue;
+			return true;
+		}
+		if(szKey == "stop_sound"){
+			m_szStopSound = szValue;
+			return true;
+		}
+		if(szKey == "engine_loop_sound_0"){
+			m_szEngineLoopSound[0] = szValue;
+			return true;
+		}
+		if(szKey == "engine_loop_sound_1"){
+			m_szEngineLoopSound[1] = szValue;
+			return true;
+		}
+		if(szKey == "engine_loop_sound_2"){
+			m_szEngineLoopSound[2] = szValue;
+			return true;
+		}
+		if(szKey == "friction_sound_0"){
+			m_szFrictionSound[0] = szValue;
+			return true;
+		}
+		if(szKey == "friction_sound_1"){
+			m_szFrictionSound[1] = szValue;
+			return true;
+		}
+		if(szKey == "friction_sound_2"){
+			m_szFrictionSound[2] = szValue;
 			return true;
 		}
 
@@ -1044,6 +1274,11 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 				return true;
 			}
 			return false;
+		}
+				
+		if(szKey == "vehicle_type"){
+			m_iVehicleType = atoi(szValue);
+			return true;
 		}
 
 		if(szKey == "volume"){
@@ -1085,22 +1320,6 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 
 		array<PhysicShapeParams> shapeParamsArray;
 
-		/*array<PhysicShapeParams> shapeParamsArray(2);
-
-		PhysicShapeParams shapeParams;
-		shapeParams.type = PhysicShape_Box;
-		shapeParams.size = Vector(46, 40, 28);
-		shapeParams.origin = Vector(-14, -10, -4);
-
-		shapeParamsArray[0] = shapeParams;
-
-		PhysicShapeParams shapeParams2;
-		shapeParams2.type = PhysicShape_Box;
-		shapeParams2.size = Vector(30, 40, 12);
-		shapeParams2.origin = Vector(62, -10, -20);
-
-		shapeParamsArray[1] = shapeParams2;*/
-
 		for(int i = 0;i < int(m_CompoundShapes.length()); ++i)
 		{
 			array<string>@ vSplit = m_CompoundShapes[i].Split(" ");
@@ -1140,7 +1359,7 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 			objectParams.flags |= PhysicObject_Freeze;
 		}
 
-		objectParams.centerofmass = m_vecCenterOfMass;//Vector(0, 0, -32);
+		objectParams.centerofmass = m_vecCenterOfMass;
 
 		g_EntityFuncs.CreateCompoundPhysicObject(self.edict(), shapeParamsArray, objectParams);
 
@@ -1155,63 +1374,97 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 		Vector wheelAxle = Vector(0, 1, 0);
 		float suspensionStiffness = 2000;
 		float suspensionDamping =  1000;
-		int springIndex = 2;
-		int engineIndex = 3;
-		int steerIndex = 5;
+		const int springIndex = 2;
+		const int engineIndex = 3;
+		const int steerIndex = 5;
 		
+		PhysicVehicleParams vehicleParams;
+		vehicleParams.type = m_iVehicleType;
+		vehicleParams.idleEngineForce = m_flIdleEngineForce;
+		vehicleParams.idleSteeringForce = m_flIdleEngineForce;
+		vehicleParams.idleSteeringSpeed = m_flSteeringSpeed;
+
 		array<PhysicWheelParams> wheelParams;
 		array<CBaseEntity@> wheelEntities;
 
 		for(int i = 0;i < int(m_Wheels.length()); ++i)
 		{
+			if(m_Wheels[i].IsEmpty())
+				continue;
+
 			CBaseEntity @pEntity = g_EntityFuncs.FindEntityByTargetname(null, m_Wheels[i]);
 			
 			if(pEntity is null)
 				continue;
 
-			if(i < 2)
+			if(m_iVehicleType == PhysicVehicleType_Airboat)
 			{
 				PhysicWheelParams wheel;
 				@wheel.ent = pEntity.edict();
 				wheel.connectionPoint = pEntity.pev.origin;
 				wheel.wheelDirection = wheelDirection;
 				wheel.wheelAxle = wheelAxle;
-				wheel.suspensionStiffness = suspensionStiffness;
-				wheel.suspensionDamping = suspensionDamping;
-				wheel.flags = PhysicWheel_Front | PhysicWheel_Steering;
+				wheel.suspensionStiffness = 2000;
+				wheel.suspensionDamping = 1000;
+				wheel.suspensionLowerLimit = -2;
+				wheel.suspensionUpperLimit = 2;
+				wheel.rayCastHeight = 20;
+				wheel.flags = PhysicWheel_Pontoon;
 				wheel.springIndex = springIndex;
 				wheel.engineIndex = engineIndex;
 				wheel.steerIndex = steerIndex;
 				wheel.index = i;
 				wheelParams.insertLast(wheel);
+
+				//TEST
+				pEntity.pev.effects |= EF_NODRAW;
 			}
 			else
 			{
-				PhysicWheelParams wheel;
-				@wheel.ent = pEntity.edict();
-				wheel.connectionPoint = pEntity.pev.origin;
-				wheel.wheelDirection = wheelDirection;
-				wheel.wheelAxle = wheelAxle;
-				wheel.suspensionStiffness = suspensionStiffness;
-				wheel.suspensionDamping = suspensionDamping;
-				wheel.flags = PhysicWheel_Engine | PhysicWheel_NoSteering;
-				wheel.springIndex = springIndex;
-				wheel.engineIndex = engineIndex;
-				wheel.steerIndex = steerIndex;
-				wheel.index = i;
-				wheelParams.insertLast(wheel);
+				if(i < 2)
+				{
+					PhysicWheelParams wheel;
+					@wheel.ent = pEntity.edict();
+					wheel.connectionPoint = pEntity.pev.origin;
+					wheel.wheelDirection = wheelDirection;
+					wheel.wheelAxle = wheelAxle;
+					wheel.suspensionStiffness = 2000;
+					wheel.suspensionDamping = 1000;
+					wheel.suspensionLowerLimit = -8;
+					wheel.suspensionUpperLimit = 8;
+					wheel.rayCastHeight = 20;
+					wheel.flags = PhysicWheel_Front | PhysicWheel_Steering;
+					wheel.springIndex = springIndex;
+					wheel.engineIndex = engineIndex;
+					wheel.steerIndex = steerIndex;
+					wheel.index = i;
+					wheelParams.insertLast(wheel);
+				}
+				else
+				{
+					PhysicWheelParams wheel;
+					@wheel.ent = pEntity.edict();
+					wheel.connectionPoint = pEntity.pev.origin;
+					wheel.wheelDirection = wheelDirection;
+					wheel.wheelAxle = wheelAxle;
+					wheel.suspensionStiffness = 2000;
+					wheel.suspensionDamping = 1000;
+					wheel.suspensionLowerLimit = -8;
+					wheel.suspensionUpperLimit = 8;
+					wheel.rayCastHeight = 20;
+					wheel.flags = PhysicWheel_Engine | PhysicWheel_NoSteering;
+					wheel.springIndex = springIndex;
+					wheel.engineIndex = engineIndex;
+					wheel.steerIndex = steerIndex;
+					wheel.index = i;
+					wheelParams.insertLast(wheel);
+				}
 			}
 
 			wheelEntities.insertLast(pEntity);
 		}
 
-		PhysicVehicleParams vehicleParams;
-
-		vehicleParams.idleEngineForce = m_flIdleEngineForce;
-		vehicleParams.idleSteeringForce = m_flIdleEngineForce;
-		vehicleParams.idleSteeringSpeed = m_flSteeringSpeed;
-
-		g_EntityFuncs.CreatePhysicVehicle(self.edict(), wheelParams, vehicleParams);
+		g_EntityFuncs.CreatePhysicVehicle(self.edict(), vehicleParams, wheelParams);
 
 		g_EntityFuncs.SetPhysicObjectFreeze(self.edict(), false);
 
@@ -1227,7 +1480,13 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 
 	void PhysicThink()
 	{
+		Vector speed = self.pev.vuser1;
+		speed.z = 0;
+		self.pev.speed = speed.Length();
+
 		UpdateSound();
+		UpdateSequence();
+		//self.StudioFrameAdvance(0.1);
 
 		self.pev.nextthink = self.pev.nextthink + 0.1;
 	}
@@ -1237,48 +1496,133 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 		
 	}
 
-	void StartLoopSound()
+	float GetAverageRPM()
 	{
-		const int VEHICLE_STARTPITCH = 80;
-		const int VEHICLE_MAXPITCH = 150;
-		const int VEHICLE_MAXSPEED = 800;
+		PhysicWheelRuntimeInfo leftEngineWheel;
+		PhysicWheelRuntimeInfo rightEngineWheel;
+		g_EntityFuncs.GetVehicleWheelRuntimeInfo(self.edict(), 2, leftEngineWheel);
+		g_EntityFuncs.GetVehicleWheelRuntimeInfo(self.edict(), 3, leftEngineWheel);
 
-		float flpitch = VEHICLE_STARTPITCH + (abs(int( self.pev.speed )) * (VEHICLE_MAXPITCH - VEHICLE_STARTPITCH) / VEHICLE_MAXSPEED);
+		return (leftEngineWheel.rpm + rightEngineWheel.rpm) * 0.5;
+	}
 
-		if (m_bIsEngineBackward)
-			flpitch *= 0.8;
-
-		if (flpitch < 50)
-			flpitch = 50;
-
-		if (flpitch > 200)
-			flpitch = 200;
-
-		if (!m_bIsPlayingLoopSound)
+	string GetDesiredLoopSound_FourWheels(float &out pitch, float &out duration)
+	{	
+		if(m_bIsEngineRunning)
 		{
-			m_szCurrentLoopSound = m_szLoopSound[Math.RandomLong(0, m_szLoopSound.length() - 1)];
-			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, m_szCurrentLoopSound, m_flVolume, ATTN_NORM, 0, int(flpitch));
+			float rpm = GetAverageRPM();
+
+			const float STARTPITCH = 80.0;
+			const float MAXPITCH = 120.0;
+
+			const float STARTSPEED = 0.0;
+			const float MAXSPEED = 120.0;
+
+			float flPitch = STARTPITCH + pow((rpm - STARTSPEED) / (MAXSPEED - STARTSPEED), 2.0) * (MAXPITCH - STARTPITCH);
+
+			if (m_bIsEngineBackward)
+				flPitch *= 0.8;
+
+			if (flPitch < 50)
+				flPitch = 50;
+
+			if (flPitch > 200)
+				flPitch = 200;
+
+			if (
+				m_szCurrentLoopSound == m_szEngineLoopSound[0] || 
+				m_szCurrentLoopSound == m_szEngineLoopSound[1] || 
+				m_szCurrentLoopSound == m_szEngineLoopSound[2])
+			{
+				if(g_Engine.time >= m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration)
+				{
+					m_iCurrentLoopEngineSoundIndex ++;
+					if(m_iCurrentLoopEngineSoundIndex > 2)
+						m_iCurrentLoopEngineSoundIndex = 0;
+				}
+			}
+
+			duration = m_flEngineLoopSoundDuration[m_iCurrentLoopEngineSoundIndex];
+			pitch = flPitch;
+
+			return m_szEngineLoopSound[m_iCurrentLoopEngineSoundIndex];
+		}
+
+		//Engine just off but was started before
+		if(
+			m_szCurrentLoopSound == m_szEngineLoopSound[0] || 
+			m_szCurrentLoopSound == m_szEngineLoopSound[1] || 
+			m_szCurrentLoopSound == m_szEngineLoopSound[2] || 
+			(m_szCurrentLoopSound == m_szTransToIdleSound && g_Engine.time < m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration))
+		{
+			float rpm = GetAverageRPM();
+
+			const float STARTPITCH = 80.0;
+			const float MAXPITCH = 120.0;
+
+			const float STARTSPEED = 0.0;
+			const float MAXSPEED = 120.0;
+
+			float flPitch = STARTPITCH + pow((rpm - STARTSPEED) / (MAXSPEED - STARTSPEED), 2.0) * (MAXPITCH - STARTPITCH);
+
+			if (m_bIsEngineBackward)
+				flPitch *= 0.8;
+
+			if (flPitch < 50)
+				flPitch = 50;
+
+			if (flPitch > 200)
+				flPitch = 200;
+
+			pitch = flPitch;
+			duration = m_flTransToIdleSoundDuration;
+
+			return m_szTransToIdleSound;
+		}
+
+		if (!m_bIsStartSoundPlayed || (m_szCurrentLoopSound == m_szStartSound && g_Engine.time < m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration))
+		{
+			pitch = 100.0;
+			duration = m_flStartSoundDuration;
+
+			return m_szStartSound;
+		}
+		
+		pitch = 100.0;
+		duration = m_flIdleLoopSoundDuration;
+
+		return m_szIdleLoopSound;
+	}
+
+	void UpdateLoopSound_FourWheels()
+	{
+		float pitch = 100.0;
+		float duration = 1.0;
+		string desiredLoopSound = GetDesiredLoopSound_FourWheels(pitch, duration);
+
+		if (!m_bIsPlayingLoopSound || desiredLoopSound != m_szCurrentLoopSound || g_Engine.time > m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration)
+		{
+			//g_Game.AlertMessage( at_console, "Playing %1 at RPM %2\n", desiredLoopSound, GetAverageRPM());
+
+			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, desiredLoopSound, m_flVolume, ATTN_NORM, 0, int(pitch));
+
+			m_szCurrentLoopSound = desiredLoopSound;
+
+			m_flCurrentLoopSoundDuration = duration;
 
 			m_flLastPlayingLoopSound = g_Engine.time;
+
 			m_bIsPlayingLoopSound = true;
+
+			m_bIsStartSoundPlayed = true;
 		}
 		else
 		{
-			if(g_Engine.time > m_flLastPlayingLoopSound + m_flLoopSoundDuration)
-			{
-				m_szCurrentLoopSound = m_szLoopSound[Math.RandomLong(0, m_szLoopSound.length() - 1)];
-				g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, m_szCurrentLoopSound, m_flVolume, ATTN_NORM, 0, int(flpitch));
-
-				m_flLastPlayingLoopSound = g_Engine.time;
-			}
-			else
-			{
-				g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, m_szCurrentLoopSound, m_flVolume, ATTN_NORM, SND_CHANGE_PITCH, int(flpitch));
-			}
+			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, m_szCurrentLoopSound, m_flVolume, ATTN_NORM, SND_CHANGE_PITCH, int(pitch));
 		}
 	}
 
-	void StopLoopSound()
+	void StopLoopSound_FourWheels()
 	{
 		if (m_bIsPlayingLoopSound)
 		{
@@ -1287,49 +1631,279 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 
 			m_bIsPlayingLoopSound = false;
 		}
+
+		m_bIsStartSoundPlayed = false;
+		m_iCurrentLoopEngineSoundIndex = 0;
 	}
 
-	void StartFrictionSound()
+	string GetFrictionSound_FourWheels(float &out pitch, float &out duration)
 	{
-		if (g_Engine.time > m_flLastPlayingFrictionSound + 2.0 && self.pev.speed > 300)
+		pitch = 100.0;
+		duration = m_flFrictionSoundDuration[0];
+
+		return m_szFrictionSound[0];
+	}
+
+	void StartFrictionSound_FourWheels()
+	{
+		if (g_Engine.time > m_flLastPlayingFrictionSound + m_flCurrentFrictionSoundDuration && self.pev.speed > 300)
 		{
-			m_szCurrentFrictionSound = m_szFrictionSound[Math.RandomLong(0, m_szFrictionSound.length() - 1)];
-			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_ITEM, m_szCurrentFrictionSound, m_flVolume, ATTN_NORM, 0, PITCH_NORM);
+			float pitch = 100.0;
+			float duration = 0;
+
+			m_szCurrentFrictionSound = GetFrictionSound_FourWheels(pitch, duration);
+			m_flCurrentFrictionSoundDuration = duration;
+
+			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_BODY, m_szCurrentFrictionSound, m_flVolume, ATTN_NORM, 0, PITCH_NORM);
 
 			m_flLastPlayingFrictionSound = g_Engine.time;
 			m_bIsPlayingFrictionSound = true;
 		}
 	}
 
-	void StopFrictionSound()
+	void StopFrictionSound_FourWheels()
 	{
 		if (m_bIsPlayingFrictionSound)
 		{
-			g_SoundSystem.StopSound(self.edict(), CHAN_STATIC, m_szCurrentFrictionSound);
+			g_SoundSystem.StopSound(self.edict(), CHAN_BODY, m_szCurrentFrictionSound);
 			m_bIsPlayingFrictionSound = false;
 		}
 	}
 
-	void UpdateSound()
+	void UpdateSequence_Airboat()
 	{
-		self.pev.speed = self.pev.vuser1.Length();
-
 		if(m_bIsEngineRunning)
 		{
-			StartLoopSound();
+			if(m_bIsEngineBackward)
+			{
+				m_flTargetSpinRate = -0.6;
+			}
+			else
+			{
+				m_flTargetSpinRate = 1.0;
+			}
 		}
 		else
 		{
-			StopLoopSound();
+			m_flTargetSpinRate = 0;
+		}
+
+		if(m_bIsSteeringLeft)
+		{
+			m_flTargetPropController = -1.0;
+		}
+		else if(m_bIsSteeringRight)
+		{
+			m_flTargetPropController = 1.0;
+		}
+		else
+		{
+			m_flTargetPropController = 0.0;
+		}
+
+		// Determine target spin rate from throttle.
+		float flTargetSpinRate = m_flTargetSpinRate;
+
+		if (flTargetSpinRate == 0.0 && GetDriver() !is null)
+		{
+			// Always keep the fan moving a little when we have a driver.
+			flTargetSpinRate = 0.2;
+		}
+
+		// Determine new spin rate,
+		if (m_flSpinRate < flTargetSpinRate)
+		{
+			if (flTargetSpinRate > 0)
+			{
+				m_flSpinRate += g_Engine.frametime * 1.0;
+			}
+			else
+			{
+				m_flSpinRate += g_Engine.frametime * 0.6;
+			}
+
+			if (m_flSpinRate > flTargetSpinRate)
+			{
+				m_flSpinRate = flTargetSpinRate;
+			}
+		}
+		else if (m_flSpinRate > flTargetSpinRate)
+		{
+			m_flSpinRate -= g_Engine.frametime * 0.6;
+			if (m_flSpinRate < flTargetSpinRate)
+			{
+				m_flSpinRate = flTargetSpinRate;
+			}
+		}
+
+		// Determine new spin rate,
+		if (m_flPropController < m_flTargetPropController)
+		{
+			m_flPropController += g_Engine.frametime * 3.0;
+
+			if (m_flPropController > m_flTargetPropController)
+			{
+				m_flPropController = m_flTargetPropController;
+			}
+		}
+		else if (m_flPropController > m_flTargetPropController)
+		{
+			m_flPropController -= g_Engine.frametime * 3.0;
+
+			if (m_flPropController < m_flTargetPropController)
+			{
+				m_flPropController = m_flTargetPropController;
+			}
+		}
+
+		self.pev.sequence = 1;
+		self.pev.framerate = m_flSpinRate;
+		self.pev.controller[2] = uint8(127.0 + m_flPropController * 127.0);
+	}
+
+	void UpdateSequence()
+	{
+		if(m_iVehicleType == PhysicVehicleType_Airboat)
+		{
+			UpdateSequence_Airboat();
+		}
+	}
+
+	void UpdateSound_FourWheels()
+	{
+		if(GetDriver() !is null)
+		{
+			UpdateLoopSound_FourWheels();
+		}
+		else
+		{
+			StopLoopSound_FourWheels();
 		}
 
 		if(m_bIsEngineBraking)
 		{
-			StartFrictionSound();
+			StartFrictionSound_FourWheels();
 		}
 		else
 		{
-			StopFrictionSound();
+			StopFrictionSound_FourWheels();
+		}
+	}
+
+	string GetDesiredLoopSound_Airboat(float &out pitch, float &out duration)
+	{	
+		if(m_bIsEngineRunning)
+		{
+			const float STARTPITCH = 60.0;
+			const float MAXPITCH = 120.0;
+
+			const float STARTSPEED = 0.0;
+			const float MAXSPEED = m_flEngineMaxSpeed;
+
+			float flPitch = STARTPITCH + (self.pev.speed - STARTSPEED) * (MAXPITCH - STARTPITCH) / (MAXSPEED - STARTSPEED);
+
+			if (
+				m_szCurrentLoopSound == m_szEngineLoopSound[0] || 
+				m_szCurrentLoopSound == m_szEngineLoopSound[1] || 
+				m_szCurrentLoopSound == m_szEngineLoopSound[2])
+			{
+				if(g_Engine.time >= m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration)
+				{
+					m_iCurrentLoopEngineSoundIndex ++;
+					if(m_iCurrentLoopEngineSoundIndex > 2)
+						m_iCurrentLoopEngineSoundIndex = 0;
+				}
+			}
+
+			duration = m_flEngineLoopSoundDuration[m_iCurrentLoopEngineSoundIndex];
+			pitch = flPitch;
+
+			return m_szEngineLoopSound[m_iCurrentLoopEngineSoundIndex];
+		}
+
+		if (!m_bIsStartSoundPlayed || (m_szCurrentLoopSound == m_szStartSound && g_Engine.time < m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration))
+		{
+			pitch = 100.0;
+			duration = m_flStartSoundDuration;
+
+			return m_szStartSound;
+		}
+
+		const float STARTPITCH = 80.0;
+		const float MAXPITCH = 120.0;
+
+		const float STARTSPEED = 0.0;
+		const float MAXSPEED = m_flEngineMaxSpeed;
+
+		float flPitch = STARTPITCH + (self.pev.speed - STARTSPEED) * (MAXPITCH - STARTPITCH) / (MAXSPEED - STARTSPEED);
+
+		pitch = flPitch;
+		duration = m_flIdleLoopSoundDuration;
+
+		return m_szIdleLoopSound;
+	}
+
+	void UpdateLoopSound_Airboat()
+	{
+		float pitch = 100.0;
+		float duration = 1.0;
+		string desiredLoopSound = GetDesiredLoopSound_Airboat(pitch, duration);
+
+		if (!m_bIsPlayingLoopSound || desiredLoopSound != m_szCurrentLoopSound || g_Engine.time > m_flLastPlayingLoopSound + m_flCurrentLoopSoundDuration)
+		{
+			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, desiredLoopSound, m_flVolume, ATTN_NORM, 0, int(pitch));
+
+			m_szCurrentLoopSound = desiredLoopSound;
+
+			m_flCurrentLoopSoundDuration = duration;
+
+			m_flLastPlayingLoopSound = g_Engine.time;
+
+			m_bIsPlayingLoopSound = true;
+
+			m_bIsStartSoundPlayed = true;
+		}
+		else
+		{
+			g_SoundSystem.EmitSoundDyn(self.edict(), CHAN_STATIC, m_szCurrentLoopSound, m_flVolume, ATTN_NORM, SND_CHANGE_PITCH, int(pitch));
+		}
+	}
+
+	void StopLoopSound_Airboat()
+	{
+		if (m_bIsPlayingLoopSound)
+		{
+			g_SoundSystem.StopSound(self.edict(), CHAN_STATIC, m_szCurrentLoopSound);
+			g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_ITEM, m_szStopSound, m_flVolume, ATTN_NORM, 0, 100 );
+
+			m_bIsPlayingLoopSound = false;
+		}
+
+		m_bIsStartSoundPlayed = false;
+		m_iCurrentLoopEngineSoundIndex = 0;
+	}
+
+	void UpdateSound_Airboat()
+	{
+		if(GetDriver() !is null)
+		{
+			UpdateLoopSound_Airboat();
+		}
+		else
+		{
+			StopLoopSound_Airboat();
+		}
+	}
+	
+	void UpdateSound()
+	{
+		if(m_iVehicleType == PhysicVehicleType_FourWheels)
+		{
+			UpdateSound_FourWheels();
+		}
+		else if(m_iVehicleType == PhysicVehicleType_Airboat)
+		{
+			UpdateSound_Airboat();
 		}
 	}
 	
@@ -1347,21 +1921,24 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 			return false;
 		}
 
-		if( pPlayer !is null )
-		{
-			g_SoundSystem.EmitSoundDyn( self.edict(), CHAN_ITEM, m_szStartSound, 1.0, ATTN_NORM, 0, PITCH_NORM );
-		}
-		else
+		//Get off the vehicle
+		if( pPlayer is null )
 		{
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, 0, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 1, 0, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 2, false, 0, m_flEngineMaxMotorForce);
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 3, false, 0, m_flEngineMaxMotorForce);
-
-			m_bIsEngineRunning = false;
-			m_bIsEngineBackward = false;
-			m_bIsEngineBraking = false;
+			
+			m_bIsStartSoundPlayed = false;
+			m_iCurrentLoopEngineSoundIndex = 0;
 		}
+		
+		m_bIsEngineRunning = false;
+		m_bIsEngineBackward = false;
+		m_bIsEngineBraking = false;
+		m_bIsSteering = false;
+		m_bIsSteeringLeft = false;
+		m_bIsSteeringRight = false;
 		
 		@m_pDriver = @pPlayer;
 		return true;
@@ -1394,12 +1971,52 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 		return false;
 	}
 
-	void HandleDriverInput(CBasePlayer@ pPlayer)
+	void HandleDriverInputAirboat(CBasePlayer@ pPlayer)
 	{
-		m_bIsEngineRunning = false;
-		m_bIsEngineBackward = false;
-		m_bIsEngineBraking = false;
+		if( ( pPlayer.pev.button & IN_FORWARD ) == IN_FORWARD )
+		{
+			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
 
+			m_bIsEngineRunning = true;
+		}
+		else if( ( pPlayer.pev.button & IN_BACK ) == IN_BACK )
+		{
+			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, true, m_flEngineMaxSpeed, -m_flEngineMaxMotorForceBackward);
+
+			m_bIsEngineRunning = true;
+			m_bIsEngineBackward = true;
+		}
+		else
+		{
+			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, false, 0, m_flEngineMaxMotorForce);
+		}
+
+		if( ( pPlayer.pev.button & IN_MOVELEFT ) == IN_MOVELEFT )
+		{
+			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, -m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+
+			m_bIsSteering = true;
+			m_bIsSteeringLeft = true;
+		}
+		else if( ( pPlayer.pev.button & IN_MOVERIGHT ) == IN_MOVERIGHT )
+		{
+			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+
+			m_bIsSteering = true;
+			m_bIsSteeringRight = true;
+		}
+		else
+		{
+			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, 0, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+
+			m_bIsSteering = false;
+			m_bIsSteeringLeft = false;
+			m_bIsSteeringRight = false;
+		}
+	}
+
+	void HandleDriverInputFourWheels(CBasePlayer@ pPlayer)
+	{
 		if( ( pPlayer.pev.button & IN_JUMP ) == IN_JUMP )
 		{
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, 0, m_flBrakeMaxMotorForce);
@@ -1412,17 +2029,17 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 			if( ( pPlayer.pev.button & IN_MOVELEFT ) == IN_MOVELEFT )
 			{
 				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, false, 0, m_flEngineMaxMotorForce);
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, -m_flEngineSpeed, m_flEngineMaxMotorForce);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, -m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
 			}
 			else if( ( pPlayer.pev.button & IN_MOVERIGHT ) == IN_MOVERIGHT )
 			{
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, -m_flEngineSpeed, m_flEngineMaxMotorForce);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, -m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
 				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, false, 0, m_flEngineMaxMotorForce);
 			}
 			else
 			{
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, -m_flEngineSpeed, m_flEngineMaxMotorForce);
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, -m_flEngineSpeed, m_flEngineMaxMotorForce);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, -m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, -m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
 			}
 
 			m_bIsEngineRunning = true;
@@ -1432,17 +2049,17 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 			if( ( pPlayer.pev.button & IN_MOVELEFT ) == IN_MOVELEFT )
 			{
 				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, false, 0, m_flEngineMaxMotorForceBackward);
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, m_flEngineSpeed, m_flEngineMaxMotorForceBackward);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForceBackward);
 			}
 			else if( ( pPlayer.pev.button & IN_MOVERIGHT ) == IN_MOVERIGHT )
 			{
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, m_flEngineSpeed, m_flEngineMaxMotorForceBackward);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForceBackward);
 				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, false, 0, m_flEngineMaxMotorForceBackward);
 			}
 			else
 			{
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, m_flEngineSpeed, m_flEngineMaxMotorForceBackward);
-				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, m_flEngineSpeed, m_flEngineMaxMotorForceBackward);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 2, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForceBackward);
+				g_EntityFuncs.SetVehicleEngine(self.edict(), 3, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForceBackward);
 			}
 			m_bIsEngineRunning = true;
 			m_bIsEngineBackward = true;
@@ -1457,16 +2074,45 @@ class CEnvPhysicVehicle : ScriptBaseEntity
 		{
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, -m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 1, -m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+			
+			m_bIsSteering = true;
+			m_bIsSteeringLeft = true;
 		}
 		else if( ( pPlayer.pev.button & IN_MOVERIGHT ) == IN_MOVERIGHT )
 		{
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 1, m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+			
+			m_bIsSteering = true;
+			m_bIsSteeringRight = true;
 		}
 		else
 		{
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, 0, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 			g_EntityFuncs.SetVehicleSteering(self.edict(), 1, 0, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+
+			m_bIsSteering = false;
+			m_bIsSteeringLeft = false;
+			m_bIsSteeringRight = false;
+		}
+	}
+
+	void HandleDriverInput(CBasePlayer@ pPlayer)
+	{
+		m_bIsEngineRunning = false;
+		m_bIsEngineBackward = false;
+		m_bIsEngineBraking = false;
+		m_bIsSteering = false;
+		m_bIsSteeringLeft = false;
+		m_bIsSteeringRight = false;
+
+		if(m_iVehicleType == PhysicVehicleType_FourWheels)
+		{
+			HandleDriverInputFourWheels(pPlayer);
+		}
+		else if(m_iVehicleType == PhysicVehicleType_Airboat)
+		{
+			HandleDriverInputAirboat(pPlayer);
 		}
 	}
 }
@@ -1479,7 +2125,7 @@ CEnvPhysicVehicle@ CEnvPhysicVehicle_Instance( CBaseEntity@ pEntity )
 	return null;
 }
 
-void PlayerHandleControlVehicle(CBasePlayer @pPlayer)
+void PlayerHandleControlVehicle_PreThink(CBasePlayer @pPlayer)
 {
 	EHandle eHandle = g_ArrayPlayerControlVehicles[pPlayer.entindex()];
 
@@ -1501,7 +2147,7 @@ void PlayerHandleControlVehicle(CBasePlayer @pPlayer)
 	pPlayer.pev.teleport_time = 99999.0;
 }
 
-void PlayerHandleControlVehicle_Post(CBasePlayer @pPlayer)
+void PlayerHandleControlVehicle_PostThink(CBasePlayer @pPlayer)
 {
 	EHandle eHandle = g_ArrayPlayerControlVehicles[pPlayer.entindex()];
 
@@ -1512,6 +2158,7 @@ void PlayerHandleControlVehicle_Post(CBasePlayer @pPlayer)
 	pPlayer.pev.sequence = 11;
 	pPlayer.pev.frame = 135.0;
 	pPlayer.pev.framerate = 0.0;
+	pPlayer.pev.teleport_time = 99999.0;
 }
 
 void PlayerRemoveControlVehicle(CBasePlayer @pPlayer)
@@ -1534,11 +2181,11 @@ void PlayerRemoveControlVehicle(CBasePlayer @pPlayer)
 	g_ArrayPlayerControlVehicles[pPlayer.entindex()] = EHandle(null);
 	g_ArrayPlayerControlVehicleTime[pPlayer.entindex()] = g_Engine.time;
 
-	pPlayer.pev.solid = SOLID_SLIDEBOX;
 	pPlayer.pev.movetype = MOVETYPE_WALK;
 	pPlayer.pev.teleport_time = 0.0;
 
 	g_EntityFuncs.SetEntityFollow(pPlayer.edict(), null, 0, Vector(0, 0, 0), Vector(0, 0, 0));
+	g_EntityFuncs.SetPhysicObjectNoCollision(pPlayer.edict(), false);
 }
 
 bool PlayerSetControlVehicle(CBasePlayer @pPlayer, CBaseEntity @pEntity)
@@ -1564,11 +2211,10 @@ bool PlayerSetControlVehicle(CBasePlayer @pPlayer, CBaseEntity @pEntity)
 	
 	g_ArrayPlayerControlVehicles[pPlayer.entindex()] = EHandle(@pEntity);
 	g_ArrayPlayerControlVehicleTime[pPlayer.entindex()] = g_Engine.time;
-	pPlayer.pev.solid = SOLID_NOT;
 	pPlayer.pev.movetype = MOVETYPE_NOCLIP;
 
 	g_EntityFuncs.SetEntityFollow(pPlayer.edict(), pEntity.edict(), FollowEnt_CopyOrigin | FollowEnt_CopyAngles | FollowEnt_UseMoveTypeFollow, Vector(0, 0, 0), Vector(0, 0, 0));
-
+	g_EntityFuncs.SetPhysicObjectNoCollision(pPlayer.edict(), true);
 	return true;
 }
 
@@ -1593,7 +2239,7 @@ HookReturnCode PlayerPreThink(CBasePlayer@ pPlayer, uint& out uiFlags)
 
 	if(pPlayer.IsAlive())
 	{
-		PlayerHandleControlVehicle(pPlayer);
+		PlayerHandleControlVehicle_PreThink(pPlayer);
 	}
 	else
 	{
@@ -1612,7 +2258,7 @@ HookReturnCode PlayerPostThinkPost(CBasePlayer@ pPlayer)
 
 	if(pPlayer.IsAlive())
 	{
-		PlayerHandleControlVehicle_Post(pPlayer);
+		PlayerHandleControlVehicle_PostThink(pPlayer);
 	}
 
 	return HOOK_CONTINUE;
@@ -1638,6 +2284,7 @@ void MapInit()
 {
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicVehicle", "env_physic_vehicle" );
+	g_CustomEntityFuncs.RegisterCustomEntity( "CFuncPhysicWater", "func_physic_water" );
 
     g_Hooks.RegisterHook(Hooks::Player::PlayerPreThink, @PlayerPreThink);
     g_Hooks.RegisterHook(Hooks::Player::PlayerPostThinkPost, @PlayerPostThinkPost);
