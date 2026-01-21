@@ -2280,6 +2280,21 @@ HookReturnCode PlayerUse(CBasePlayer@ pPlayer, uint& out uiFlags)
     return HOOK_CONTINUE;
 }
 
+HookReturnCode PlayerSpawn(CBasePlayer@ pPlayer)
+{
+    if(pPlayer is null || !pPlayer.IsNetClient())
+        return HOOK_CONTINUE;
+
+	NetworkMessage message( MSG_ONE, NetworkMessages::SVC_STUFFTEXT, pPlayer.edict() );
+		message.WriteString("thirdperson;cam_idealdist 100;\n");
+	message.End();
+
+	pPlayer.SetMaxSpeed(270);
+	pPlayer.pev.solid = SOLID_SLIDEBOX;
+
+    return HOOK_CONTINUE;
+}
+
 void MapInit()
 {
 	g_CustomEntityFuncs.RegisterCustomEntity( "CEnvPhysicModel", "env_physicmodel" );
@@ -2291,6 +2306,7 @@ void MapInit()
     g_Hooks.RegisterHook(Hooks::Player::PlayerUse, @PlayerUse);
 	g_Hooks.RegisterHook(Hooks::Player::ClientPutInServer, @ClientPutInServer );
 	g_Hooks.RegisterHook(Hooks::Player::ClientDisconnect, @ClientDisconnect );
+	g_Hooks.RegisterHook(Hooks::Player::PlayerSpawn, @PlayerSpawn);
 
 	g_EngineFuncs.EnablePhysicWorld(true);
 }
