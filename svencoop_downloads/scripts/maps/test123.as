@@ -1,3 +1,93 @@
+/*
+================================================================================
+Physics-based Vehicle Testing Scripts for Sven Co-op
+================================================================================
+
+脚本大纲 (Script Outline):
+
+1. 常量定义 (Constants) [Line 37-202]
+   ├── PhysicShapeDirection_* - 物理形状方向常量 (X/Y/Z)
+   ├── PhysicShape_* - 物理形状类型 (Box/Sphere/Capsule/Cylinder/MultiSphere)
+   ├── PhysicObject_* - 物理对象标志位 (碰撞壳/冲击/冻结)
+   ├── PhysicWheel_* - 车轮标志位 (前轮/引擎/刹车/转向/浮筒)
+   ├── PhysicVehicleType_* - 车辆类型 (四轮车/气垫船)
+   ├── FollowEnt_* - 实体跟随标志位
+   ├── EnvStudioAnim_* - StudioModel动画标志位
+   ├── LOD_* - 细节层次常量
+   ├── c_Player* - 玩家相关常量
+   ├── FL_* or EF_* - 实体标志位
+   ├── TS_* - 火车状态常量
+   ├── SF_* - SpawnFlags (画刷旋转/传送带/轨道火车/门/物理模型/触发器等)
+   └── FCAP_* or TASKSTATUS_* - 功能标志和任务状态
+
+2. 全局变量 (Global Variables) [Line 203-205]
+   ├── g_ArrayPlayerControlVehicles - 玩家控制的车辆数组
+   └── g_ArrayPlayerControlVehicleTime - 玩家控制车辆的时间记录
+
+3. 类定义 (Class Definitions)
+
+   3.1 CFuncPhysicWater [Line 207-248] - 物理水域实体
+       ├── 属性: m_flDensity, m_flLinearDrag, m_flAngularDrag
+       └── 方法: Precache(), Spawn(), KeyValue()
+
+   3.2 CEnvPhysicModel [Line 250-735] - 物理模型实体
+       ├── 属性: 形状参数/物理参数/碰撞参数/音效参数/生存边界等
+       └── 方法: Precache(), Spawn(), KeyValue(), PhysicTouch(), PhysicThink(), Use()
+
+   3.3 CFuncPhysicPushable [Line 737-1006] - 可推动物理实体
+       ├── 属性: 形状参数/物理参数/生存边界
+       └── 方法: Precache(), Spawn(), KeyValue(), PhysicThink(), PhysicTouch()
+
+   3.4 CEnvPhysicVehicle [Line 1008-2153] - 物理车辆实体 (核心类)
+       ├── 属性:
+       │   ├── 物理参数 (质量/摩擦/弹性/CCD等)
+       │   ├── 引擎参数 (空转力/最大力/最大速度等)
+       │   ├── 转向参数 (转向力/速度/最大角度等)
+       │   ├── 音效系统 (启动/怠速/引擎循环/摩擦等)
+       │   ├── 车轮配置 (4个车轮实体)
+       │   └── 状态标志 (引擎运行/倒车/刹车/转向等)
+       ├── 方法:
+       │   ├── Precache() - 预缓存资源
+       │   ├── Spawn() - 生成实体
+       │   ├── KeyValue() - 键值解析
+       │   ├── Restart() - 重置车辆
+       │   ├── InitThink() - 初始化物理车辆
+       │   ├── PhysicThink() - 物理思考
+       │   ├── 音效系统:
+       │   │   ├── GetDesiredLoopSound_FourWheels/Airboat()
+       │   │   ├── UpdateLoopSound_FourWheels/Airboat()
+       │   │   ├── StopLoopSound_FourWheels/Airboat()
+       │   │   ├── GetFrictionSound_FourWheels()
+       │   │   ├── StartFrictionSound_FourWheels()
+       │   │   └── StopFrictionSound_FourWheels()
+       │   ├── UpdateSequence() - 更新动画序列
+       │   ├── UpdateSound() - 更新音效
+       │   ├── GetDriver()/SetDriver() - 驾驶员管理
+       │   ├── Use() - 使用回调
+       │   └── HandleDriverInput*() - 处理驾驶员输入
+
+4. 辅助函数 (Helper Functions) [Line 2155-2161]
+   └── CEnvPhysicVehicle_Instance() - 获取车辆实例
+
+5. 玩家车辆控制函数 (Player Vehicle Control) [Line 2163-2254]
+   ├── PlayerHandleControlVehicle_PreThink() - 预思考处理
+   ├── PlayerHandleControlVehicle_PostThink() - 后思考处理
+   ├── PlayerRemoveControlVehicle() - 移除玩家控制
+   └── PlayerSetControlVehicle() - 设置玩家控制
+
+6. 钩子回调函数 (Hook Callbacks) [Line 2256-2331]
+   ├── ClientPutInServer() - 玩家进入服务器
+   ├── ClientDisconnect() - 玩家断开连接
+   ├── PlayerPreThink() - 玩家预思考
+   ├── PlayerPostThinkPost() - 玩家后思考
+   ├── PlayerUse() - 玩家使用
+   └── PlayerSpawn() - 玩家重生
+
+7. 地图初始化 (Map Initialization) [Line 2333-2347]
+   └── MapInit() - 注册实体和钩子
+
+================================================================================
+*/
 
 const int PhysicShapeDirection_X = 0;
 const int PhysicShapeDirection_Y = 1;
@@ -1973,13 +2063,15 @@ class CEnvPhysicVehicle : ScriptBaseAnimating
 
 	void HandleDriverInputAirboat(CBasePlayer@ pPlayer)
 	{
+		bool bIsBackward = (( pPlayer.pev.button & IN_BACK ) == IN_BACK);
+
 		if( ( pPlayer.pev.button & IN_FORWARD ) == IN_FORWARD )
 		{
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, true, m_flEngineMaxSpeed, m_flEngineMaxMotorForce);
 
 			m_bIsEngineRunning = true;
 		}
-		else if( ( pPlayer.pev.button & IN_BACK ) == IN_BACK )
+		else if( bIsBackward )
 		{
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, true, m_flEngineMaxSpeed, -m_flEngineMaxMotorForceBackward);
 
@@ -1991,16 +2083,19 @@ class CEnvPhysicVehicle : ScriptBaseAnimating
 			g_EntityFuncs.SetVehicleEngine(self.edict(), 0, false, 0, m_flEngineMaxMotorForce);
 		}
 
+		// 后退时反转转向方向
+		float flSteeringSign = bIsBackward ? -1.0 : 1.0;
+
 		if( ( pPlayer.pev.button & IN_MOVELEFT ) == IN_MOVELEFT )
 		{
-			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, -m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, -m_flMaxSteeringAngular * flSteeringSign, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 
 			m_bIsSteering = true;
 			m_bIsSteeringLeft = true;
 		}
 		else if( ( pPlayer.pev.button & IN_MOVERIGHT ) == IN_MOVERIGHT )
 		{
-			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, m_flMaxSteeringAngular, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
+			g_EntityFuncs.SetVehicleSteering(self.edict(), 0, m_flMaxSteeringAngular * flSteeringSign, m_flSteeringSpeed, m_flSteeringMaxMotorForce);
 
 			m_bIsSteering = true;
 			m_bIsSteeringRight = true;
